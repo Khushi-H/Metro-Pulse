@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Metro Pulse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column app. A metro route line at the top shows the three games as stations.
+   One game screen below it. Tabs switch between Play, Design notes and Live data. */
+:root{
+  --bg:#eef1f5; --surface:#ffffff; --ink:#14202e; --muted:#566475; --line:#d3dae3;
+  --red:#d32f3a; --blue:#1d5fc4; --green:#17835a; --amber:#b87a00; --on-accent:#ffffff;
+  --soft-blue:#e3edfb; --soft-red:#fbe6e8; --soft-green:#def3e9;
+  --f-display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --f-body:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1620; --surface:#17212e; --ink:#e8eef6; --muted:#98a6b8; --line:#2a3647;
+  --red:#ff7079; --blue:#6aa2ff; --green:#4cc790; --amber:#f5bf3a; --on-accent:#0b1220;
+  --soft-blue:#1c2c47; --soft-red:#3a2026; --soft-green:#183a2e; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0f1620; --surface:#17212e; --ink:#e8eef6; --muted:#98a6b8; --line:#2a3647;
+  --red:#ff7079; --blue:#6aa2ff; --green:#4cc790; --amber:#f5bf3a; --on-accent:#0b1220;
+  --soft-blue:#1c2c47; --soft-red:#3a2026; --soft-green:#183a2e; color-scheme:dark; }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;line-height:1.05;margin:0;text-wrap:balance;letter-spacing:.2px}
+h1{font-size:clamp(34px,7vw,48px)} h2{font-size:28px} h3{font-size:21px}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-size:12.5px}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:1px;text-transform:uppercase}
+.brand i{display:block;width:30px;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--red) 0 33%,var(--blue) 33% 66%,var(--green) 66%)}
+.credits{font-family:var(--f-mono);font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px}
+.credits b{color:var(--green)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);font:600 15px var(--f-body);padding:8px 12px;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blue)}
+
+.route{display:flex;align-items:flex-start;position:relative;padding:4px 0}
+.route .stop{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;text-align:center;min-width:0}
+.route .stop::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:5px;background:var(--line);z-index:0}
+.route .stop:first-child::before{display:none}
+.route .stop.done::before,.route .stop.now::before{background:var(--c)}
+.dot{width:26px;height:26px;border-radius:50%;border:5px solid var(--line);background:var(--surface);z-index:1}
+.stop.now .dot{border-color:var(--c)}
+.stop.done .dot{background:var(--c);border-color:var(--c)}
+.stop span{font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.2}
+.stop.now span,.stop.done span{color:var(--ink)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px}
+.q{font-size:19px;font-weight:500;line-height:1.35}
+.note{font-size:14px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tile{position:relative;text-align:left;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:12px;color:var(--ink);font:500 15px/1.25 var(--f-body);cursor:pointer;min-height:64px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+.tile.on{border-color:var(--blue);background:var(--soft-blue)}
+.tile[disabled]{opacity:.45;cursor:not-allowed}
+.tile .sub{font-size:12.5px;color:var(--muted)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--blue);color:var(--on-accent);border:0;border-radius:10px;padding:12px 20px;font:600 16px var(--f-body);cursor:pointer}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.btn.sm{padding:6px 12px;font-size:14px}
+button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+
+.pips{display:flex;gap:8px;align-items:center}
+.pip{width:22px;height:22px;border-radius:50%;border:2px solid var(--blue);background:var(--blue)}
+.pip.off{background:transparent}
+.tokrow{display:flex;align-items:center;gap:6px;margin-top:2px}
+.tokbadge{background:var(--blue);color:var(--on-accent);border-radius:999px;font:600 13px var(--f-body);padding:1px 9px}
+.minus{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:6px;width:28px;height:28px;font-size:18px;line-height:1;cursor:pointer}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--bg);border:2px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 14px;font:500 15px var(--f-body);cursor:pointer}
+.chip.on{border-color:var(--blue);background:var(--soft-blue)}
+.zonerow{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+
+.cars{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.car{background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:10px;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;gap:8px;text-align:left;font:500 13.5px/1.25 var(--f-body)}
+.car.on{border-color:var(--blue);background:var(--soft-blue)}
+.car.out{opacity:.4}
+.grid{display:grid;grid-template-columns:repeat(9,1fr);gap:3px;border:2px solid var(--line);border-radius:8px;padding:5px;background:var(--surface)}
+.cell{aspect-ratio:1;border-radius:50%;background:var(--line);opacity:.45}
+.cell.p{background:var(--blue);opacity:1}
+.thr{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--line)}
+.thr h3{font-size:20px}
+
+.tickets{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ticket{background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:16px;color:var(--ink);cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:6px;font-family:var(--f-body)}
+.ticket:hover{border-color:var(--blue)}
+.ticket .big{font-family:var(--f-display);font-size:42px;font-weight:700;line-height:1}
+.ticket .l{font-size:12.5px;color:var(--muted);font-family:var(--f-mono);text-transform:uppercase;letter-spacing:1px}
+@media(max-width:420px){.tickets{grid-template-columns:1fr}}
+
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pair>div{min-width:0;padding:14px;border-radius:10px;background:var(--bg);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.pair .tag{font-family:var(--f-mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase}
+.pair .o .tag{color:var(--red)} .pair .n .tag{color:var(--green)}
+@media(max-width:560px){.pair{grid-template-columns:1fr}}
+.gauge{display:flex;gap:16px;flex-wrap:wrap}
+.gauge>div{flex:1;min-width:130px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.gauge b{font-family:var(--f-display);font-size:40px;line-height:1}
+.flag{font-size:14px;background:var(--soft-red);border-radius:8px;padding:8px 12px}
+.ok{font-size:14px;background:var(--soft-green);border-radius:8px;padding:8px 12px}
+.result li{margin-bottom:6px}
+ul{margin:0;padding-left:20px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-family:var(--f-mono);font-size:12px}
+td,th{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.d{color:var(--muted);word-break:break-word;min-width:200px}
+@media (prefers-reduced-motion:no-preference){.tile,.car,.chip{transition:border-color .12s,background .12s}}
+</style>
+
+<style>html,body{margin:0}</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ---------- data ---------- */
+const ZONES=[
+ {id:'edge',name:'Platform edge',sub:'Floor, yellow line'},
+ {id:'bench',name:'Benches and seating',sub:'Seats, armrests'},
+ {id:'stairs',name:'Stairs and escalators',sub:'Steps, handrails'},
+ {id:'bins',name:'Bins and waste points',sub:'Overflow, smell'},
+ {id:'wc',name:'Restrooms',sub:'Inside or at the door'},
+ {id:'gate',name:'Ticket gates and concourse',sub:'Floor, walls, glass'},
+ {id:'lift',name:'Lifts',sub:'Floor, buttons'}
+];
+const ISSUES=['Litter','Stains','Smell','Wet or slippery','Looks fine, keep it up'];
+const SLOTS=['Before 8 am','8 to 10 am','10 am to 5 pm','5 to 8 pm','After 8 pm'];
+const LEVELS=[
+ {n:1,count:4,label:'Plenty of seats'},
+ {n:2,count:11,label:'Few seats left'},
+ {n:3,count:19,label:'Standing room'},
+ {n:4,count:28,label:'Packed, touching'},
+ {n:5,count:36,label:'Cannot move'}
+];
+const MIN={g1a:1500,g1b:2500,g1c:2000,g2a:1200,g2b:2000,g2c:3000,g3r1:2500,g3r2:1500,g3r3:1500,g3r4:1500};
+const STATIONS=[
+ {name:'Clean-up crew',c:'var(--red)'},
+ {name:'Skip or board',c:'var(--blue)'},
+ {name:'Trade-off tickets',c:'var(--green)'}
+];
+const ORIG=[
+ 'How satisfied are you with station cleanliness? (1 to 5)',
+ 'How crowded are the trains on your commute? (Not crowded to Very crowded)',
+ 'Do you think metro fares are reasonable? (Agree to Disagree)'
+];
+
+/* ---------- scoring (pure function, also unit-tested offline) ---------- */
+//<score>
+function score(ev){
+  const MINR={g1a:1500,g1b:2500,g1c:2000,g2a:1200,g2b:2000,g2c:3000,g3r1:2500,g3r2:1500,g3r3:1500,g3r4:1500};
+  const commits=ev.filter(e=>e.type==='commit');
+  if(!commits.length) return null;
+  const flags=[];
+  const fast=commits.filter(c=>c.rt_commit<MINR[c.key]);
+  if(fast.length) flags.push('Rushed: '+fast.length+' of '+commits.length+' steps were committed faster than they can be read ('+fast.map(c=>c.key+' '+(c.rt_commit/1000).toFixed(1)+'s').join(', ')+').');
+  const pace=(commits.length-fast.length)/commits.length;
+  const checks=[];
+  const g1a=commits.find(c=>c.key==='g1a');
+  if(g1a){ const pass=!(g1a.n>=7&&g1a.rt_commit<4000); checks.push(pass);
+    if(!pass) flags.push('Tap-all: every station area was marked as used in under 4s.'); }
+  const th=ev.find(e=>e.type==='g2_thresholds');
+  if(th){ checks.push(th.ok);
+    if(!th.ok) flags.push('Inconsistent: would board a fuller train when the next one is 3 min away than when it is 10 min away.'); }
+  const att=ev.find(e=>e.type==='g3_attention');
+  if(att){ checks.push(att.passed);
+    if(!att.passed) flags.push('Attention check failed: picked the ticket that was both dearer and slower.'); }
+  const consistency=checks.length?checks.filter(Boolean).length/checks.length:1;
+  const sides=ev.filter(e=>e.type==='ticket_choice').map(e=>e.side);
+  let pattern=1;
+  if(sides.length>=4&&new Set(sides).size===1){ pattern=0;
+    flags.push('Patterned: always picked the '+sides[0]+' ticket although sides were randomised.'); }
+  const quality=Math.round(100*(0.4*pace+0.4*consistency+0.2*pattern));
+  const expected=ev.some(e=>e.type==='no_recent_trip')?7:10;
+  const completion=Math.min(1,commits.length/expected);
+  const deliberate=commits.filter(c=>c.rt_commit>=MINR[c.key]&&c.rt_commit<=90000).length/commits.length;
+  const depthParts=[];
+  const g1b=commits.find(c=>c.key==='g1b'); if(g1b) depthParts.push(Math.min(1,g1b.placed/3));
+  const picks=ev.filter(e=>e.type==='issue_pick');
+  if(picks.length) depthParts.push(picks.filter(p=>p.val!=='Looks fine, keep it up').length/picks.length);
+  depthParts.push(ev.some(e=>e.type==='edit')?1:0);
+  const depth=depthParts.reduce((a,b)=>a+b,0)/depthParts.length;
+  const engagement=Math.round(100*(0.4*completion+0.3*deliberate+0.3*depth));
+  return {quality,engagement,pace,consistency,pattern,completion,deliberate,depth,flags};
+}
+//</score>
+
+/* ---------- state ---------- */
+let S;
+function reset(){
+  S={t0:performance.now(),events:[],credits:0,view:'play',screen:'intro',shown:performance.now(),first:null,acts:0,
+     g1:{used:[],tok:{},issue:{},skipped:false},
+     g2:{slot:null,seen:null,thr:{3:null,10:null}},
+     g3:{round:0,lo:0,hi:40,cur:null,result:null}};
+  log('session_start',{});
+}
+function log(type,data){ S.events.push(Object.assign({t:Math.round(performance.now()-S.t0),type:type},data||{})); }
+function startPrompt(){ S.shown=performance.now(); S.first=null; S.acts=0; }
+function touch(){ if(S.first===null) S.first=Math.round(performance.now()-S.shown); S.acts++; }
+function commit(key,data){ log('commit',Object.assign({key:key,rt_first:S.first,rt_commit:Math.round(performance.now()-S.shown),acts:S.acts},data||{})); }
+function go(screen){ S.screen=screen; startPrompt(); if(screen==='g3') setupRound(); render(); window.scrollTo(0,0); }
+function edit(what){ log('edit',{what:what}); }
+
+/* ---------- game 3 staircase ---------- */
+function setupRound(){
+  const r=S.g3.round, side=Math.random()<0.5?'left':'right';
+  if(r<3){
+    const extra=r===0?20:Math.round((S.g3.lo+S.g3.hi)/2);
+    S.g3.cur={r:r,extra:extra,dom:false,goodSide:side,
+      good:{fare:20+extra,min:35,name:'Express'}, other:{fare:20,min:50,name:'Local'}};
+  }else{
+    S.g3.cur={r:3,extra:0,dom:true,goodSide:side,
+      good:{fare:25,min:40,name:'Direct'}, other:{fare:35,min:55,name:'Via interchange'}};
+  }
+}
+function wtp(){ return (S.g3.lo+S.g3.hi)/2; }
+
+/* ---------- actions ---------- */
+const A={
+ start(){ go('g1a'); },
+ noTrip(){ log('no_recent_trip',{}); S.g1.skipped=true; go('g2a'); },
+ zone(d){ touch(); const u=S.g1.used,i=u.indexOf(d.id);
+   if(i>=0){u.splice(i,1); edit('zone_untap');} else u.push(d.id);
+   log('zone_toggle',{zone:d.id,on:i<0}); render(); },
+ g1aNext(){ commit('g1a',{n:S.g1.used.length}); go('g1b'); },
+ tokAdd(d){ const left=3-Object.values(S.g1.tok).reduce((a,b)=>a+b,0); if(left<=0) return;
+   touch(); S.g1.tok[d.id]=(S.g1.tok[d.id]||0)+1; log('token_add',{zone:d.id}); render(); },
+ tokSub(d){ if(!S.g1.tok[d.id]) return; touch(); S.g1.tok[d.id]--; if(!S.g1.tok[d.id]) delete S.g1.tok[d.id];
+   edit('token_remove'); log('token_remove',{zone:d.id}); render(); },
+ g1bNext(){ const placed=Object.values(S.g1.tok).reduce((a,b)=>a+b,0);
+   commit('g1b',{placed:placed,unused:3-placed}); go('g1c'); },
+ issue(d){ touch(); if(S.g1.issue[d.id]&&S.g1.issue[d.id]!==d.val) edit('issue_change');
+   S.g1.issue[d.id]=d.val; log('issue_pick',{zone:d.id,val:d.val}); render(); },
+ g1cNext(){ commit('g1c',{}); S.credits+=10; log('game_complete',{game:1}); go('g2a'); },
+ slot(d){ touch(); if(S.g2.slot!==null&&S.g2.slot!=+d.i) edit('slot_change');
+   S.g2.slot=+d.i; log('trip_slot',{slot:SLOTS[+d.i]}); render(); },
+ g2aNext(){ commit('g2a',{}); go('g2b'); },
+ seen(d){ touch(); if(S.g2.seen!==null&&S.g2.seen!==+d.n) edit('carriage_change');
+   S.g2.seen=+d.n; log('carriage_pick',{level:+d.n}); render(); },
+ g2bNext(){ commit('g2b',{}); go('g2c'); },
+ thr(d){ touch(); const prev=S.g2.thr[d.w]; if(prev!==null&&prev!==+d.n) edit('threshold_change');
+   S.g2.thr[d.w]=+d.n; log('threshold',{wait_min:+d.w,level:+d.n}); render(); },
+ g2cNext(){ const t3=S.g2.thr[3],t10=S.g2.thr[10];
+   log('g2_thresholds',{t3:t3,t10:t10,ok:t10>=t3});
+   commit('g2c',{}); S.credits+=10; log('game_complete',{game:2}); go('g3'); },
+ ticket(d){
+   const cur=S.g3.cur, pickedGood=d.side===cur.goodSide; touch();
+   log('ticket_choice',{round:cur.r+1,side:d.side,picked:pickedGood?(cur.dom?'dominant':'fast'):(cur.dom?'dominated':'slow'),
+     extra:cur.extra,rt:Math.round(performance.now()-S.shown)});
+   commit('g3r'+(cur.r+1),{side:d.side});
+   if(!cur.dom){ if(pickedGood) S.g3.lo=cur.extra; else S.g3.hi=cur.extra; }
+   else{ log('g3_attention',{passed:pickedGood}); }
+   S.g3.round++;
+   if(S.g3.round>3){ S.credits+=10; log('game_complete',{game:3}); S.g3.result=wtp(); go('done'); }
+   else{ startPrompt(); setupRound(); render(); }
+ },
+ tab(d){ S.view=d.v; render(); },
+ copyLog(){ const txt=JSON.stringify(S.events,null,1);
+   try{ navigator.clipboard.writeText(txt).then(function(){S.copied=true;render();setTimeout(function(){S.copied=false;render();},1500);}).catch(function(){}); }catch(e){} },
+ again(){ reset(); render(); window.scrollTo(0,0); }
+};
+document.addEventListener('click',function(e){
+  const el=e.target.closest('[data-act]'); if(!el||el.disabled) return;
+  const f=A[el.dataset.act]; if(f) f(el.dataset);
+});
+
+/* ---------- views ---------- */
+function carriage(level){
+  // fixed shuffled order so each level nests inside the next one
+  const order=[17,3,30,8,22,0,26,12,34,5,19,28,1,14,24,9,32,6,20,35,11,27,2,16,31,7,23,13,29,4,18,33,10,25,15,21];
+  const on=new Set(order.slice(0,level.count));
+  let h='<div class="grid" aria-hidden="true">';
+  for(let i=0;i<36;i++) h+='<span class="cell'+(on.has(i)?' p':'')+'"></span>';
+  return h+'</div>';
+}
+function levelBtn(act,attrs,lv,on,out){
+  return '<button class="car'+(on?' on':'')+(out?' out':'')+'" data-act="'+act+'" '+attrs+' aria-pressed="'+!!on+'">'+
+    carriage(lv)+'<span><b>'+lv.n+'</b> '+lv.label+'</span></button>';
+}
+function header(){
+  const tabs=[['play','Play'],['notes','Design notes'],['data','Live data']];
+  return '<header><div class="brand"><i></i>Metro Pulse</div><div class="credits">Ride credits <b>'+S.credits+'</b></div></header>'+
+    '<div class="tabs" role="tablist">'+tabs.map(function(t){
+      return '<button class="tab" role="tab" aria-selected="'+(S.view===t[0])+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
+}
+function route(){
+  const idx=S.screen==='intro'?-1:S.screen.indexOf('g1')===0?0:S.screen.indexOf('g2')===0?1:S.screen==='g3'?2:3;
+  return '<div class="route">'+STATIONS.map(function(s,i){
+    return '<div class="stop '+(i<idx?'done':i===idx?'now':'')+'" style="--c:'+s.c+'"><div class="dot"></div><span>'+s.name+'</span></div>';}).join('')+'</div>';
+}
+function playView(){
+  const sc=S.screen; let h=route();
+  if(sc==='intro'){
+    h+='<div class="card"><div class="eyebrow">3 quick games, about 2 minutes</div>'+
+      '<h1>Think of your last metro trip.</h1>'+
+      '<p class="q">Three short games ask what you actually did and saw on it. The city uses the answers to plan routes, timings and fares.</p>'+
+      '<p class="note">You earn 10 ride credits for finishing each game. Credits do not depend on what you answer, so there is nothing to gain from guessing what sounds right. Every game has an honest way out if a question does not apply to you.</p>'+
+      '<div class="btnrow"><button class="btn" data-act="start">Start the first game</button></div></div>';
+  }
+  else if(sc==='g1a'){
+    h+='<div class="card"><div class="eyebrow">Game 1 of 3 · Clean-up crew · step 1 of 3</div>'+
+      '<p class="q">Picture your last trip from your usual station. Tap every spot you actually used or walked through.</p>'+
+      '<div class="tiles">'+ZONES.map(function(z){const on=S.g1.used.indexOf(z.id)>=0;
+        return '<button class="tile'+(on?' on':'')+'" data-act="zone" data-id="'+z.id+'" aria-pressed="'+on+'"><span>'+z.name+'</span><span class="sub">'+z.sub+'</span></button>';}).join('')+'</div>'+
+      '<div class="btnrow"><button class="btn" data-act="g1aNext" '+(S.g1.used.length?'':'disabled')+'>Next</button>'+
+      '<button class="btn ghost" data-act="noTrip">I have not taken the metro lately</button></div></div>';
+  }
+  else if(sc==='g1b'){
+    const placed=Object.values(S.g1.tok).reduce((a,b)=>a+b,0), left=3-placed;
+    h+='<div class="card"><div class="eyebrow">Game 1 of 3 · Clean-up crew · step 2 of 3</div>'+
+      '<p class="q">The cleaning crew can make 3 visits today. Send them where cleaning would help you most. You can stack visits on one spot.</p>'+
+      '<div class="pips" aria-label="'+left+' visits left">'+[0,1,2].map(function(i){return '<span class="pip'+(i<left?'':' off')+'"></span>';}).join('')+'<span class="note">'+left+' left</span></div>'+
+      '<div class="tiles">'+ZONES.filter(function(z){return S.g1.used.indexOf(z.id)>=0;}).map(function(z){const n=S.g1.tok[z.id]||0;
+        return '<div class="tile'+(n?' on':'')+'"><button class="tile" style="border:0;padding:0;min-height:0;background:none" data-act="tokAdd" data-id="'+z.id+'" '+(left?'':'disabled')+'><span>'+z.name+'</span></button>'+
+          '<div class="tokrow">'+(n?'<span class="tokbadge">'+n+' visit'+(n>1?'s':'')+'</span><button class="minus" data-act="tokSub" data-id="'+z.id+'" aria-label="Remove a visit from '+z.name+'">−</button>':'<span class="sub">Tap to send a visit</span>')+'</div></div>';}).join('')+'</div>'+
+      '<p class="note">Spots you did not use are not offered. You can leave visits unused if nothing else needs cleaning.</p>'+
+      '<div class="btnrow"><button class="btn" data-act="g1bNext" '+(placed?'':'disabled')+'>Next</button></div></div>';
+  }
+  else if(sc==='g1c'){
+    const zs=ZONES.filter(function(z){return S.g1.tok[z.id];});
+    const all=zs.every(function(z){return S.g1.issue[z.id];});
+    h+='<div class="card"><div class="eyebrow">Game 1 of 3 · Clean-up crew · step 3 of 3</div>'+
+      '<p class="q">What should the crew deal with at each spot?</p>'+
+      zs.map(function(z){return '<div class="zonerow"><h3>'+z.name+'</h3><div class="chips">'+ISSUES.map(function(v){
+        return '<button class="chip'+(S.g1.issue[z.id]===v?' on':'')+'" data-act="issue" data-id="'+z.id+'" data-val="'+v+'" aria-pressed="'+(S.g1.issue[z.id]===v)+'">'+v+'</button>';}).join('')+'</div></div>';}).join('')+
+      '<div class="btnrow"><button class="btn" data-act="g1cNext" '+(all?'':'disabled')+'>Finish game 1 · +10 credits</button></div></div>';
+  }
+  else if(sc==='g2a'){
+    h+='<div class="card"><div class="eyebrow">Game 2 of 3 · Skip or board · step 1 of 3</div>'+
+      '<p class="q">When did your last trip start?</p>'+
+      '<div class="chips">'+SLOTS.map(function(s,i){return '<button class="chip'+(S.g2.slot===i?' on':'')+'" data-act="slot" data-i="'+i+'" aria-pressed="'+(S.g2.slot===i)+'">'+s+'</button>';}).join('')+'</div>'+
+      '<div class="btnrow"><button class="btn" data-act="g2aNext" '+(S.g2.slot===null?'disabled':'')+'>Next</button></div></div>';
+  }
+  else if(sc==='g2b'){
+    h+='<div class="card"><div class="eyebrow">Game 2 of 3 · Skip or board · step 2 of 3</div>'+
+      '<p class="q">Each picture is a carriage seen from above. Which one looks most like your carriage on that trip ('+SLOTS[S.g2.slot].toLowerCase()+')?</p>'+
+      '<div class="cars">'+LEVELS.map(function(l){return levelBtn('seen','data-n="'+l.n+'"',l,S.g2.seen===l.n,false);}).join('')+'</div>'+
+      '<div class="btnrow"><button class="btn" data-act="g2bNext" '+(S.g2.seen?'':'disabled')+'>Next</button></div></div>';
+  }
+  else if(sc==='g2c'){
+    const t=S.g2.thr;
+    function row(w){
+      return '<div class="thr"><h3>The next train is '+w+' minutes away.</h3><p class="note">Tap the fullest carriage you would still get on. Anything fuller, you would let pass.</p>'+
+        '<div class="cars">'+'<button class="car'+(t[w]===0?' on':'')+'" data-act="thr" data-w="'+w+'" data-n="0" aria-pressed="'+(t[w]===0)+'"><span><b>0</b> I would let this train go whatever it looks like</span></button>'+
+        LEVELS.map(function(l){return levelBtn('thr','data-w="'+w+'" data-n="'+l.n+'"',l,t[w]===l.n,t[w]!==null&&l.n>t[w]);}).join('')+'</div></div>';
+    }
+    h+='<div class="card"><div class="eyebrow">Game 2 of 3 · Skip or board · step 3 of 3</div>'+
+      '<p class="q">Now imagine you are on the platform and a train pulls in.</p>'+row(3)+row(10)+
+      '<div class="btnrow"><button class="btn" data-act="g2cNext" '+(t[3]!==null&&t[10]!==null?'':'disabled')+'>Finish game 2 · +10 credits</button></div></div>';
+  }
+  else if(sc==='g3'){
+    const c=S.g3.cur, sides=c.goodSide==='left'?['good','other']:['other','good'];
+    h+='<div class="card"><div class="eyebrow">Game 3 of 3 · Trade-off tickets · round '+(c.r+1)+' of 4</div>'+
+      '<p class="q">You are making the same trip. Two tickets are on offer. Tap the one you would buy.</p>'+
+      '<div class="tickets">'+['left','right'].map(function(side,i){const o=c[sides[i]];
+        return '<button class="ticket" data-act="ticket" data-side="'+side+'"><span class="l">'+o.name+'</span><span class="big">₹'+o.fare+'</span><span>'+o.min+' minutes door to door</span></button>';}).join('')+'</div>'+
+      '<p class="note">No right answer. Pick what you would really do on a normal weekday.</p></div>';
+  }
+  else if(sc==='done'){
+    const sc2=score(S.events);
+    const used=ZONES.filter(function(z){return S.g1.used.indexOf(z.id)>=0;}).map(function(z){return z.name;});
+    const top=ZONES.filter(function(z){return S.g1.tok[z.id];}).map(function(z){return z.name+' ('+S.g1.tok[z.id]+') for '+(S.g1.issue[z.id]||'').toLowerCase();});
+    const w=S.g3.result, lo=S.g3.lo, hi=S.g3.hi;
+    const cl=S.g2.seen?LEVELS[S.g2.seen-1].label.toLowerCase():'';
+    h+='<div class="card result"><div class="eyebrow">Done · '+S.credits+' credits earned</div><h1>Thanks. Here is what your answers told us.</h1>'+
+      '<ul>'+
+      (S.g1.skipped?'<li><b>Station:</b> no recent trip, so nothing was recorded.</li>':'<li><b>Station:</b> you used '+used.length+' areas. Crew sent to '+top.join('; ')+'.</li>')+
+      '<li><b>Crowding:</b> your '+SLOTS[S.g2.slot].toLowerCase()+' carriage looked like “'+cl+'”. You would board up to level '+S.g2.thr[3]+' with a 3 minute wait and level '+S.g2.thr[10]+' with a 10 minute wait.</li>'+
+      '<li><b>Fares:</b> you would pay about ₹'+w+' extra (between ₹'+lo+' and ₹'+hi+') to save 15 minutes. That is roughly ₹'+(w*4)+' for each hour saved.</li></ul>'+
+      '<p class="note">A 5-star or agree/disagree question would have recorded one number per topic, with no sign of what you used, what you would skip, or what a minute is worth to you.</p>'+
+      (sc2?'<div class="gauge"><div><span class="eyebrow">Answer quality</span><b>'+sc2.quality+'</b><span class="note">weight used in planning: '+(sc2.quality/100).toFixed(2)+'</span></div>'+
+        '<div><span class="eyebrow">Engagement</span><b>'+sc2.engagement+'</b><span class="note">completion, deliberation, depth</span></div></div>'+
+        (sc2.flags.length?sc2.flags.map(function(f){return '<div class="flag">'+f+'</div>';}).join(''):'<div class="ok">No rushed, patterned or inconsistent answers detected.</div>'):'')+
+      '<div class="btnrow"><button class="btn" data-act="tab" data-v="data">See the event log</button><button class="btn ghost" data-act="again">Play again</button></div></div>';
+  }
+  return h;
+}
+
+function notesView(){
+  function pair(o,n,why,beh){
+    return '<div class="card"><div class="pair"><div class="o"><span class="tag">Original question</span><span>'+o+'</span></div>'+
+      '<div class="n"><span class="tag">Redesigned game</span><span>'+n+'</span></div></div>'+
+      '<div><div class="eyebrow">Why this design</div><p>'+why+'</p></div>'+
+      '<div><div class="eyebrow">Behaviour captured that the original misses</div><p>'+beh+'</p></div></div>';
+  }
+  return '<div class="card"><div class="eyebrow">Part A · The questions</div><h2>How the three prompts were answered</h2>'+
+    '<div><h3>1. Getting at what commuters do, not what they think they should say</h3>'+
+    '<p>Every game starts from one specific recent trip, so people recall instead of generalise. The game asks what they used and what they would choose when something has a cost: three cleaning visits, a train they could let pass, a ticket that costs more. A choice under a limit shows priorities that a rating cannot. Each game has an honest exit (no recent trip, would let it go) so people are not forced to invent an answer.</p></div>'+
+    '<div><h3>2. Turning a question into a game without changing what it measures</h3>'+
+    '<p>Each question has a written measurement contract: what is measured, in which unit, over which period. The game changes how it is asked, not what it is asking. Credits are fixed per game, positions are randomised, and no answer is rewarded more than another, so the game cannot teach people which answer pays. To check the contract holds, run the game and the old survey side by side on a sample. Stable facts should agree. Where they differ, the difference is the bias the survey was hiding.</p></div>'+
+    '<div><h3>3. How AI could judge and improve the questions it writes</h3>'+
+    '<p>A judge model scores each draft against a rubric: leading wording, two questions in one, vague time window, attitude instead of behaviour, more than one construct. A second pass answers as simulated commuters of different types to find confusing or lopsided options. After launch, real data takes over. Questions with high drop-off, instant answers, many contradictions or one-sided answers are flagged, the model proposes rewrites for those, and the rewrite is tested against the old version. A person approves every change before it ships.</p></div></div>'+
+  pair(ORIG[0],'<b>Clean-up crew.</b> Tap the areas you used on your last trip, spend 3 cleaning visits on them, then say what needs fixing at each.',
+    'Satisfaction with cleanliness mixes mood, expectation and which parts of the station a person even touched. Limited visits force a ranking. Naming the problem (litter, smell, stains, wet floor) tells the city which crew and which schedule.',
+    'Which areas were used at all, so riders do not judge places they never visited. The relative order of problems when resources are scarce. The type of dirt. A person who rates “4” but spends two visits on the bins is telling us something the 4 hides.')+
+  pair(ORIG[1],'<b>Skip or board.</b> Pick the carriage picture that matches your trip at a stated time, then mark the fullest carriage you would board with a 3 minute and a 10 minute wait.',
+    '“Crowded” means different things to different people. Pictures with fixed density replace the adjective with a shared scale. Asking when they would let a train pass turns an opinion into a threshold the city can plan around.',
+    'Actual density by time slot. How much crowding people accept as the wait changes, which shows whether a faster service or a bigger train would shift riders. The comparison of the two thresholds is also a built-in consistency check.')+
+  pair(ORIG[2],'<b>Trade-off tickets.</b> Four rounds of choosing between two tickets. The express costs more and saves 15 minutes. The extra fare moves up or down depending on your last choice. Round 4 is an obvious pick.',
+    'Asking whether fares are reasonable invites a complaint. Choosing between two tickets shows what a rider will actually pay. The adaptive steps find the point where a rider switches in three taps.',
+    'A price for saved time per rider (shown as rupees per hour saved) instead of an opinion. Side positions are randomised, which exposes people who tap the same side, and round 4 acts as an attention check.')+
+  '<div class="card"><div class="eyebrow">Part A · Question 3 in practice</div><h3>Example of how an AI judge would score the questions</h3>'+
+    '<p class="note">An illustration of the rubric output, written by hand to show the format. It is not a live model run.</p>'+
+    '<div class="scroll"><table><thead><tr><th>Question</th><th>Neutral wording</th><th>Asks behaviour</th><th>Clear time window</th><th>One construct</th><th>Hard to game</th><th>Verdict</th></tr></thead><tbody>'+
+    '<tr><td>Cleanliness rating (original)</td><td>Pass</td><td>Fail</td><td>Fail</td><td>Fail</td><td>Fail</td><td>Rewrite</td></tr>'+
+    '<tr><td>Clean-up crew</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Keep, watch step 3 drop-off</td></tr>'+
+    '<tr><td>Crowding adjective (original)</td><td>Pass</td><td>Fail</td><td>Fail</td><td>Pass</td><td>Fail</td><td>Rewrite</td></tr>'+
+    '<tr><td>Skip or board</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Weak: one check only</td><td>Keep, add a second check</td></tr>'+
+    '<tr><td>Fare agree/disagree (original)</td><td>Fail: invites complaint</td><td>Fail</td><td>Fail</td><td>Fail</td><td>Fail</td><td>Rewrite</td></tr>'+
+    '<tr><td>Trade-off tickets</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Pass</td><td>Keep</td></tr>'+
+    '</tbody></table></div></div>'+
+  '</div>';
+}
+
+function dataView(){
+  const sc=score(S.events);
+  let h='<div class="card"><div class="eyebrow">Part B · The data</div><h2>What this session logged</h2>';
+  if(!sc){ h+='<p class="muted">Play a game and the events appear here.</p>'; }
+  else{
+    h+='<div class="gauge"><div><span class="eyebrow">Quality (0 to 100)</span><b>'+sc.quality+'</b><span class="note">pace '+Math.round(sc.pace*100)+'% · consistency '+Math.round(sc.consistency*100)+'% · pattern '+Math.round(sc.pattern*100)+'%</span></div>'+
+      '<div><span class="eyebrow">Engagement (0 to 100)</span><b>'+sc.engagement+'</b><span class="note">completion '+Math.round(sc.completion*100)+'% · deliberation '+Math.round(sc.deliberate*100)+'% · depth '+Math.round(sc.depth*100)+'%</span></div></div>'+
+      (sc.flags.length?sc.flags.map(function(f){return '<div class="flag">'+f+'</div>';}).join(''):'<div class="ok">No flags so far.</div>');
+  }
+  h+='<p class="note"><b>Quality</b> = 40% pace (decisions not faster than reading time) + 40% consistency (3 min vs 10 min threshold, attention round, tap-all check) + 20% pattern (same side every round). <b>Engagement</b> = 40% completion + 30% deliberation (decisions between the minimum reading time and 90 s) + 30% depth (visits placed, specific issues named, changes of mind). Engagement counts steps finished, not time saved, so finishing faster never raises it.</p></div>';
+  const rows=S.events.slice(-60).reverse().map(function(e){
+    const c=Object.assign({},e); delete c.t; delete c.type;
+    return '<tr><td>'+e.t+'</td><td>'+e.type+'</td><td class="d">'+JSON.stringify(c)+'</td></tr>';}).join('');
+  h+='<div class="card"><div class="btnrow" style="justify-content:space-between"><h3>Event log (latest first)</h3><button class="btn sm ghost" data-act="copyLog">'+(S.copied?'Copied':'Copy log as JSON')+'</button></div><div class="scroll"><table><thead><tr><th>ms</th><th>event</th><th>fields</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  return h;
+}
+
+function render(){
+  document.getElementById('app').innerHTML=header()+(S.view==='play'?playView():S.view==='notes'?notesView():dataView());
+}
+reset(); render();
+</script>
+</body>
+</html>
