@@ -29,4 +29,4 @@ Open `index.html` in a browser. Fonts load from Google Fonts and fall back to sy
 
 ## Playable link
 
-PASTE-YOUR-PUBLIC-LINK-HERE
+https://khushi-h.github.io/Metro-Pulse/
